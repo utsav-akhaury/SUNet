@@ -8,8 +8,8 @@ class SUNet_model(nn.Module):
         self.config = config
         self.swin_unet = SUNet(img_size=config['SWINUNET']['IMG_SIZE'],
                                patch_size=config['SWINUNET']['PATCH_SIZE'],
-                               in_chans=3,
-                               out_chans=3,
+                               in_chans=config['SWINUNET']['IN_CHANS'],
+                               out_chans=config['SWINUNET']['OUT_CHANS'],
                                embed_dim=config['SWINUNET']['EMB_DIM'],
                                depths=config['SWINUNET']['DEPTH_EN'],
                                num_heads=config['SWINUNET']['HEAD_NUM'],
@@ -24,8 +24,8 @@ class SUNet_model(nn.Module):
                                use_checkpoint=config['SWINUNET']['USE_CHECKPOINTS'])
 
     def forward(self, x):
-        if x.size()[1] == 1:
-            x = x.repeat(1, 3, 1, 1)
+        # if x.size()[1] == 1:
+        #     x = x.repeat(1, 3, 1, 1)
         logits = self.swin_unet(x)
         return logits
     

@@ -1,4 +1,6 @@
 import os
+from this import d
+from traceback import print_tb
 
 import torch
 import yaml
@@ -6,13 +8,14 @@ import yaml
 from utils import network_parameters
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
+from torch.utils.data import TensorDataset, DataLoader
+from torchvision.transforms import Lambda
 
 import time
 import utils
 import numpy as np
 import random
-from data_RGB import get_training_data, get_validation_data
+# from data_RGB import get_training_data, get_validation_data
 
 from warmup_scheduler import GradualWarmupScheduler
 from tqdm import tqdm
@@ -31,6 +34,7 @@ with open('training.yaml', 'r') as config:
     opt = yaml.safe_load(config)
 Train = opt['TRAINING']
 OPT = opt['OPTIM']
+SUNet = opt['SWINUNET']
 
 ## Build Model
 print('==> Build the model')
@@ -92,12 +96,63 @@ L1_loss = nn.L1Loss()
 
 ## DataLoaders
 print('==> Loading datasets')
-train_dataset = get_training_data(train_dir, {'patch_size': Train['TRAIN_PS']})
-train_loader = DataLoader(dataset=train_dataset, batch_size=OPT['BATCH'],
-                          shuffle=True, num_workers=0, drop_last=False)
-val_dataset = get_validation_data(val_dir, {'patch_size': Train['VAL_PS']})
-val_loader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=False, num_workers=0,
-                        drop_last=False)
+# train_dataset = get_training_data(train_dir, {'patch_size': Train['TRAIN_PS']})
+# train_loader = DataLoader(dataset=train_dataset, batch_size=OPT['BATCH'],
+#                           shuffle=True, num_workers=0, drop_last=False)
+# val_dataset = get_validation_data(val_dir, {'patch_size': Train['VAL_PS']})
+# val_loader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=False, num_workers=0,
+#                         drop_last=False)
+
+# Read Saved Batches   
+x_train = np.load('/home/users/a/akhaury/scratch/SingleChannel_Deconv/x_train.npy')
+y_train = np.load('/home/users/a/akhaury/scratch/SingleChannel_Deconv/y_train.npy')
+
+
+# Normalize targets
+y_train = y_train - np.mean(y_train, axis=(1,2), keepdims=True)
+norm_fact = np.max(y_train, axis=(1,2), keepdims=True) 
+y_train /= norm_fact
+
+# Normalize & scale tikho inputs
+x_train = x_train - np.mean(x_train, axis=(1,2), keepdims=True)
+x_train /= norm_fact
+
+# NCHW convention
+x_train = np.moveaxis(x_train, -1, 1)
+y_train = np.moveaxis(y_train, -1, 1)
+
+# Convert to torch tensor
+x_train = torch.tensor(x_train)
+y_train = torch.tensor(y_train)
+print(x_train.size(), y_train.size())
+
+
+# train_dataset = TensorDataset(y_train, x_train)
+# val_dataset = TensorDataset(y_train, x_train)
+
+
+# train_loader = DataLoader(dataset=train_dataset, batch_size=OPT['BATCH'],
+#                           shuffle=True, num_workers=0, drop_last=False)
+# val_loader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=False, num_workers=0,
+#                         drop_last=False)
+
+## Data Augmentation funciton
+def augmentation(im, seed):
+    random.seed(seed)
+    a = random.choice([0,1,2,3])
+    if a==0:
+        return im
+    elif a==1:
+        ch = random.choice([1, 2, 3])
+        return torch.rot90(im, ch, [-2,-1])
+    elif a==2:
+        ch = random.choice([-2, -1])
+        return torch.flip(im, [ch])
+    elif a==3:
+        ch1 = random.choice([10, -10])
+        ch2 = random.choice([-2, -1])
+        return torch.roll(im, ch1, dims=ch2)
+
 
 # Show the training configuration
 print(f'''==> Training details:
@@ -125,17 +180,36 @@ for epoch in range(start_epoch, OPT['EPOCHS'] + 1):
     epoch_loss = 0
     train_id = 1
 
+    # Randomly split train-validation set for every epoch
+    n_obj = x_train.size()[0]
+    n_train = np.int16(0.9*n_obj)
+
+    ind = np.arange(n_obj)
+    np.random.shuffle(ind)
+
+    train_dataset = TensorDataset(y_train[ind][:n_train], x_train[ind][:n_train])
+    val_dataset = TensorDataset(y_train[ind][n_train:], x_train[ind][n_train:])
+
+    train_loader = DataLoader(dataset=train_dataset, batch_size=OPT['BATCH'],
+                            shuffle=True, num_workers=0, drop_last=False)
+    val_loader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=False, num_workers=0,
+                            drop_last=False)
+
     model_restored.train()
-    for i, data in enumerate(tqdm(train_loader), 0):
+    # for i, data in enumerate(tqdm(train_loader), 0):
+    for i, data in enumerate(train_loader, 0):
         # Forward propagation
         for param in model_restored.parameters():
             param.grad = None
         target = data[0].cuda()
         input_ = data[1].cuda()
+        seed = random.randint(0,1000000)
+        target = Lambda(lambda x: torch.stack([augmentation(x_, seed) for x_ in x]))(target)
+        input_ = Lambda(lambda x: torch.stack([augmentation(x_, seed) for x_ in x]))(input_)
         restored = model_restored(input_)
 
         # Compute loss
-        #loss = Charbonnier_loss(restored, target)
+        # loss = Charbonnier_loss(restored, target)
         loss = L1_loss(restored, target)
 
         # Back propagation
@@ -168,7 +242,7 @@ for epoch in range(start_epoch, OPT['EPOCHS'] + 1):
             torch.save({'epoch': epoch,
                         'state_dict': model_restored.state_dict(),
                         'optimizer': optimizer.state_dict()
-                        }, os.path.join(model_dir, "model_bestPSNR.pth"))
+                        }, os.path.join(model_dir, "model_bestPSNR_ep-{}_bs-{}_ps-{}_ws-{}_embdim-{}.pth".format(OPT['EPOCHS'], OPT['BATCH'], SUNet['PATCH_SIZE'], SUNet['WIN_SIZE'], SUNet['EMB_DIM']))) 
         print("[epoch %d PSNR: %.4f --- best_epoch %d Best_PSNR %.4f]" % (
             epoch, psnr_val_rgb, best_epoch_psnr, best_psnr))
 
@@ -179,7 +253,7 @@ for epoch in range(start_epoch, OPT['EPOCHS'] + 1):
             torch.save({'epoch': epoch,
                         'state_dict': model_restored.state_dict(),
                         'optimizer': optimizer.state_dict()
-                        }, os.path.join(model_dir, "model_bestSSIM.pth"))
+                        }, os.path.join(model_dir, "model_bestSSIM_ep-{}_bs-{}_ps-{}_ws-{}_embdim-{}.pth".format(OPT['EPOCHS'], OPT['BATCH'], SUNet['PATCH_SIZE'], SUNet['WIN_SIZE'], SUNet['EMB_DIM'])))
         print("[epoch %d SSIM: %.4f --- best_epoch %d Best_SSIM %.4f]" % (
             epoch, ssim_val_rgb, best_epoch_ssim, best_ssim))
 
@@ -204,11 +278,11 @@ for epoch in range(start_epoch, OPT['EPOCHS'] + 1):
     torch.save({'epoch': epoch,
                 'state_dict': model_restored.state_dict(),
                 'optimizer': optimizer.state_dict()
-                }, os.path.join(model_dir, "model_latest.pth"))
+                }, os.path.join(model_dir, "model_latest_ep-{}_bs-{}_ps-{}_ws-{}_embdim-{}.pth".format(OPT['EPOCHS'], OPT['BATCH'], SUNet['PATCH_SIZE'], SUNet['WIN_SIZE'], SUNet['EMB_DIM'])))
 
     writer.add_scalar('train/loss', epoch_loss, epoch)
     writer.add_scalar('train/lr', scheduler.get_lr()[0], epoch)
 writer.close()
 
 total_finish_time = (time.time() - total_start_time)  # seconds
-print('Total training time: {:.1f} hours'.format((total_finish_time / 60 / 60)))
+print('Total training time: {:.1f} seconds'.format((total_finish_time)))

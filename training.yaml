@@ -4,10 +4,12 @@ GPU: [0,1,2,3]
 VERBOSE: False
 
 SWINUNET:
-  IMG_SIZE: 256
+  IMG_SIZE: 128
   PATCH_SIZE: 4
+  IN_CHANS: 1
+  OUT_CHANS: 1
   WIN_SIZE: 8
-  EMB_DIM: 96
+  EMB_DIM: 48
   DEPTH_EN: [8, 8, 8, 8]
   HEAD_NUM: [8, 8, 8, 8]
   MLP_RATIO: 4.0
@@ -26,8 +28,8 @@ MODEL:
 
 # Optimization arguments.
 OPTIM:
-  BATCH: 4
-  EPOCHS: 200
+  BATCH: 32
+  EPOCHS: 100 #200
   # EPOCH_DECAY: [10]
   LR_INITIAL: 2e-4
   LR_MIN: 1e-6
@@ -36,8 +38,8 @@ OPTIM:
 TRAINING:
   VAL_AFTER_EVERY: 1
   RESUME: False
-  TRAIN_PS: 256
-  VAL_PS: 256
+  TRAIN_PS: 128
+  VAL_PS: 128 
   TRAIN_DIR: './datasets/Denoising_DIV2K/train'       # path to training data
   VAL_DIR: './datasets/Denoising_DIV2K/test' # path to validation data
-  SAVE_DIR: './checkpoints'           # path to save models and images
+  SAVE_DIR: '/home/users/a/akhaury/scratch/SingleChannel_Deconv/Trained_Models/SUNet'           # path to save models and images
