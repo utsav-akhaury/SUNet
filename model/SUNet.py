@@ -1,5 +1,5 @@
 import torch.nn as nn
-from model.SUNet_detail import SUNet
+from model.SUNet_detail_unembedded import SUNet
 
 
 class SUNet_model(nn.Module):
@@ -21,7 +21,8 @@ class SUNet_model(nn.Module):
                                drop_path_rate=config['SWINUNET']['DROP_PATH_RATE'],
                                ape=config['SWINUNET']['APE'],
                                patch_norm=config['SWINUNET']['PATCH_NORM'],
-                               use_checkpoint=config['SWINUNET']['USE_CHECKPOINTS'])
+                               use_checkpoint=config['SWINUNET']['USE_CHECKPOINTS'],
+                               final_upsample=config['SWINUNET']['FINAL_UPSAMPLE'])
 
     def forward(self, x):
         # if x.size()[1] == 1:

@@ -5,12 +5,12 @@ VERBOSE: False
 
 SWINUNET:
   IMG_SIZE: 128
-  PATCH_SIZE: 4
+  PATCH_SIZE: 1
   IN_CHANS: 1
   OUT_CHANS: 1
   WIN_SIZE: 8
   EMB_DIM: 48
-  DEPTH_EN: [8, 8, 8, 8]
+  DEPTH_EN: [2, 6, 8, 16]
   HEAD_NUM: [8, 8, 8, 8]
   MLP_RATIO: 4.0
   QKV_BIAS: True
@@ -21,18 +21,18 @@ SWINUNET:
   APE: False
   PATCH_NORM: True
   USE_CHECKPOINTS: False
-  FINAL_UPSAMPLE: 'Dual up-sample'
+  FINAL_UPSAMPLE: 'bilinear'
 
 MODEL:
   MODE: 'Denoising'
 
 # Optimization arguments.
 OPTIM:
-  BATCH: 32
-  EPOCHS: 100 #200
+  BATCH: 16 #32
+  EPOCHS: 1 #200
   # EPOCH_DECAY: [10]
-  LR_INITIAL: 2e-4
-  LR_MIN: 1e-6
+  LR_INITIAL: 1e-3 #2e-4
+  LR_MIN: 1e-5 #1e-6
   # BETA1: 0.9
 
 TRAINING:

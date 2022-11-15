@@ -1,6 +1,6 @@
 import os
 from this import d
-from traceback import print_tb
+# from traceback import print_tb
 
 import torch
 import yaml
@@ -10,6 +10,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import TensorDataset, DataLoader
 from torchvision.transforms import Lambda
+from torch.nn.functional import interpolate
 
 import time
 import utils
@@ -18,9 +19,31 @@ import random
 # from data_RGB import get_training_data, get_validation_data
 
 from warmup_scheduler import GradualWarmupScheduler
-from tqdm import tqdm
+# from tqdm import tqdm
 from tensorboardX import SummaryWriter
 from model.SUNet import SUNet_model
+
+import gc
+# from GPUtil import showUtilization as gpu_usage
+# from numba import cuda as cd
+
+def free_gpu_cache():
+    # print("Initial GPU Usage")
+    # gpu_usage()                             
+
+    gc.collect()
+    torch.cuda.empty_cache()
+
+    # cd.select_device(0)
+    # cd.close()
+    # # dvc = cd.get_current_device()
+    # # dvc.reset()
+    # cd.select_device(0)
+
+    # print("GPU Usage after emptying the cache")
+    # gpu_usage()
+
+free_gpu_cache() 
 
 ## Set Seeds
 torch.backends.cudnn.benchmark = True
@@ -126,6 +149,7 @@ x_train = torch.tensor(x_train)
 y_train = torch.tensor(y_train)
 print(x_train.size(), y_train.size())
 
+free_gpu_cache() 
 
 # train_dataset = TensorDataset(y_train, x_train)
 # val_dataset = TensorDataset(y_train, x_train)
@@ -195,6 +219,9 @@ for epoch in range(start_epoch, OPT['EPOCHS'] + 1):
     val_loader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=False, num_workers=0,
                             drop_last=False)
 
+    del train_dataset, val_dataset
+    free_gpu_cache() 
+
     model_restored.train()
     # for i, data in enumerate(tqdm(train_loader), 0):
     for i, data in enumerate(train_loader, 0):
@@ -203,14 +230,22 @@ for epoch in range(start_epoch, OPT['EPOCHS'] + 1):
             param.grad = None
         target = data[0].cuda()
         input_ = data[1].cuda()
+        # print(target.size(), input_.size())
         seed = random.randint(0,1000000)
         target = Lambda(lambda x: torch.stack([augmentation(x_, seed) for x_ in x]))(target)
         input_ = Lambda(lambda x: torch.stack([augmentation(x_, seed) for x_ in x]))(input_)
         restored = model_restored(input_)
+        # print(restored.size())
+
+        if restored.size() != target.size():
+            restored = interpolate(restored, size=(target.size()[-2], target.size()[-1]), mode='nearest-exact')
 
         # Compute loss
         # loss = Charbonnier_loss(restored, target)
-        loss = L1_loss(restored, target)
+        loss = L1_loss(restored, target)   
+
+        del target, input_, data
+        free_gpu_cache() 
 
         # Back propagation
         loss.backward()
@@ -227,10 +262,15 @@ for epoch in range(start_epoch, OPT['EPOCHS'] + 1):
             input_ = data_val[1].cuda()
             with torch.no_grad():
                 restored = model_restored(input_)
+                if restored.size() != target.size():
+                    restored = interpolate(restored, size=(target.size()[-2], target.size()[-1]), mode='nearest-exact')
 
             for res, tar in zip(restored, target):
                 psnr_val_rgb.append(utils.torchPSNR(res, tar))
                 ssim_val_rgb.append(utils.torchSSIM(restored, target))
+
+            del target, input_, data_val
+            free_gpu_cache() 
 
         psnr_val_rgb = torch.stack(psnr_val_rgb).mean().item()
         ssim_val_rgb = torch.stack(ssim_val_rgb).mean().item()
@@ -242,7 +282,7 @@ for epoch in range(start_epoch, OPT['EPOCHS'] + 1):
             torch.save({'epoch': epoch,
                         'state_dict': model_restored.state_dict(),
                         'optimizer': optimizer.state_dict()
-                        }, os.path.join(model_dir, "model_bestPSNR_ep-{}_bs-{}_ps-{}_ws-{}_embdim-{}.pth".format(OPT['EPOCHS'], OPT['BATCH'], SUNet['PATCH_SIZE'], SUNet['WIN_SIZE'], SUNet['EMB_DIM']))) 
+                        }, os.path.join(model_dir, "model_bestPSNR_ep-{}_bs-{}_ps-{}.pth".format(OPT['EPOCHS'], OPT['BATCH'], SUNet['PATCH_SIZE'], SUNet['WIN_SIZE'], SUNet['EMB_DIM']))) 
         print("[epoch %d PSNR: %.4f --- best_epoch %d Best_PSNR %.4f]" % (
             epoch, psnr_val_rgb, best_epoch_psnr, best_psnr))
 
@@ -253,7 +293,7 @@ for epoch in range(start_epoch, OPT['EPOCHS'] + 1):
             torch.save({'epoch': epoch,
                         'state_dict': model_restored.state_dict(),
                         'optimizer': optimizer.state_dict()
-                        }, os.path.join(model_dir, "model_bestSSIM_ep-{}_bs-{}_ps-{}_ws-{}_embdim-{}.pth".format(OPT['EPOCHS'], OPT['BATCH'], SUNet['PATCH_SIZE'], SUNet['WIN_SIZE'], SUNet['EMB_DIM'])))
+                        }, os.path.join(model_dir, "model_bestSSIM_ep-{}_bs-{}_ps-{}.pth".format(OPT['EPOCHS'], OPT['BATCH'], SUNet['PATCH_SIZE'], SUNet['WIN_SIZE'], SUNet['EMB_DIM'])))
         print("[epoch %d SSIM: %.4f --- best_epoch %d Best_SSIM %.4f]" % (
             epoch, ssim_val_rgb, best_epoch_ssim, best_ssim))
 
@@ -278,10 +318,14 @@ for epoch in range(start_epoch, OPT['EPOCHS'] + 1):
     torch.save({'epoch': epoch,
                 'state_dict': model_restored.state_dict(),
                 'optimizer': optimizer.state_dict()
-                }, os.path.join(model_dir, "model_latest_ep-{}_bs-{}_ps-{}_ws-{}_embdim-{}.pth".format(OPT['EPOCHS'], OPT['BATCH'], SUNet['PATCH_SIZE'], SUNet['WIN_SIZE'], SUNet['EMB_DIM'])))
+                }, os.path.join(model_dir, "model_latest_ep-{}_bs-{}_ps-{}.pth".format(OPT['EPOCHS'], OPT['BATCH'], SUNet['PATCH_SIZE'], SUNet['WIN_SIZE'], SUNet['EMB_DIM'])))
 
     writer.add_scalar('train/loss', epoch_loss, epoch)
     writer.add_scalar('train/lr', scheduler.get_lr()[0], epoch)
+
+    del train_loader, val_loader, epoch_loss
+    free_gpu_cache() 
+
 writer.close()
 
 total_finish_time = (time.time() - total_start_time)  # seconds
