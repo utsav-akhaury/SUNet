@@ -69,9 +69,9 @@ model_restored.cuda()
 mode = opt['MODEL']['MODE']
 
 model_dir = os.path.join(Train['SAVE_DIR'], mode, 'models')
-utils.mkdir(model_dir)
-train_dir = Train['TRAIN_DIR']
-val_dir = Train['VAL_DIR']
+# utils.mkdir(model_dir)
+# train_dir = Train['TRAIN_DIR']
+# val_dir = Train['VAL_DIR']
 
 ## GPU
 gpus = ','.join([str(i) for i in opt['GPU']])
@@ -102,7 +102,7 @@ scheduler.step()
 
 ## Resume (Continue training by a pretrained model)
 if Train['RESUME']:
-    path_chk_rest = utils.get_last_path(model_dir, '_latest.pth')
+    path_chk_rest = utils.get_last_path(model_dir, '_latest_ep-400_bs-16_ps-1.pth')
     utils.load_checkpoint(model_restored, path_chk_rest)
     start_epoch = utils.load_start_epoch(path_chk_rest) + 1
     utils.load_optim(optimizer, path_chk_rest)
@@ -150,15 +150,6 @@ y_train = torch.tensor(y_train)
 print(x_train.size(), y_train.size())
 
 free_gpu_cache() 
-
-# train_dataset = TensorDataset(y_train, x_train)
-# val_dataset = TensorDataset(y_train, x_train)
-
-
-# train_loader = DataLoader(dataset=train_dataset, batch_size=OPT['BATCH'],
-#                           shuffle=True, num_workers=0, drop_last=False)
-# val_loader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=False, num_workers=0,
-#                         drop_last=False)
 
 ## Data Augmentation funciton
 def augmentation(im, seed):
@@ -282,7 +273,7 @@ for epoch in range(start_epoch, OPT['EPOCHS'] + 1):
             torch.save({'epoch': epoch,
                         'state_dict': model_restored.state_dict(),
                         'optimizer': optimizer.state_dict()
-                        }, os.path.join(model_dir, "model_bestPSNR_ep-{}_bs-{}_ps-{}.pth".format(OPT['EPOCHS'], OPT['BATCH'], SUNet['PATCH_SIZE'], SUNet['WIN_SIZE'], SUNet['EMB_DIM']))) 
+                        }, os.path.join(model_dir, "model_bestPSNR_ep-{}_bs-{}_ps-{}.pth".format(OPT['EPOCHS'], OPT['BATCH'], SUNet['PATCH_SIZE']))) 
         print("[epoch %d PSNR: %.4f --- best_epoch %d Best_PSNR %.4f]" % (
             epoch, psnr_val_rgb, best_epoch_psnr, best_psnr))
 
@@ -293,7 +284,7 @@ for epoch in range(start_epoch, OPT['EPOCHS'] + 1):
             torch.save({'epoch': epoch,
                         'state_dict': model_restored.state_dict(),
                         'optimizer': optimizer.state_dict()
-                        }, os.path.join(model_dir, "model_bestSSIM_ep-{}_bs-{}_ps-{}.pth".format(OPT['EPOCHS'], OPT['BATCH'], SUNet['PATCH_SIZE'], SUNet['WIN_SIZE'], SUNet['EMB_DIM'])))
+                        }, os.path.join(model_dir, "model_bestSSIM_ep-{}_bs-{}_ps-{}.pth".format(OPT['EPOCHS'], OPT['BATCH'], SUNet['PATCH_SIZE'])))
         print("[epoch %d SSIM: %.4f --- best_epoch %d Best_SSIM %.4f]" % (
             epoch, ssim_val_rgb, best_epoch_ssim, best_ssim))
 
@@ -318,7 +309,7 @@ for epoch in range(start_epoch, OPT['EPOCHS'] + 1):
     torch.save({'epoch': epoch,
                 'state_dict': model_restored.state_dict(),
                 'optimizer': optimizer.state_dict()
-                }, os.path.join(model_dir, "model_latest_ep-{}_bs-{}_ps-{}.pth".format(OPT['EPOCHS'], OPT['BATCH'], SUNet['PATCH_SIZE'], SUNet['WIN_SIZE'], SUNet['EMB_DIM'])))
+                }, os.path.join(model_dir, "model_latest_ep-{}_bs-{}_ps-{}.pth".format(OPT['EPOCHS'], OPT['BATCH'], SUNet['PATCH_SIZE'])))
 
     writer.add_scalar('train/loss', epoch_loss, epoch)
     writer.add_scalar('train/lr', scheduler.get_lr()[0], epoch)
