@@ -68,7 +68,7 @@ def load_checkpoint(model, weights):
 model = SUNet_model(opt)
 model.cuda()
 
-load_checkpoint(model, model_dir+'model_bestPSNR_ep-400_bs-16_ps-1.pth')
+load_checkpoint(model, model_dir+'model_bestSSIM_ep-300_bs-16_ps-1.pth')
 model.eval()
 
 
@@ -94,7 +94,7 @@ res_sunet = np.squeeze(res_sunet.permute(0, 2, 3, 1).cpu().detach().numpy())
 x_test = np.squeeze(x_test.permute(0, 2, 3, 1).cpu().detach().numpy())
 y_test = np.squeeze(y_test.permute(0, 2, 3, 1).cpu().detach().numpy())
 
-with open(dat_dir+'outputs/sunet_ep-353.pkl', 'wb') as f1:
+with open(dat_dir+'outputs/sunet_ep-241.pkl', 'wb') as f1:
     pickle.dump(res_sunet, f1, protocol=pickle.HIGHEST_PROTOCOL)
 
 
