@@ -68,19 +68,20 @@ def load_checkpoint(model, weights):
 model = SUNet_model(opt)
 model.cuda()
 
-load_checkpoint(model, model_dir+'model_latest_ep-100_bs-32_ps-4_ws-8_embdim-48.pth')
+load_checkpoint(model, model_dir+'model_bestSSIM_ep-300_bs-16_ps-1.pth')
 model.eval()
 
 
 res_sunet = torch.zeros(x_test.size())
 print(res_sunet.size())
 
-for i in range(0, x_test.size()[0], 500):
+process_bs = 100
+for i in range(0, x_test.size()[0], process_bs):
 
-    if i+500 > x_test.size()[0]:
+    if i+process_bs > x_test.size()[0]:
         ind = x_test.size()[0]
     else:
-        ind = i+500
+        ind = i + process_bs
 
     input_ = x_test[i:ind].cuda()
     print(input_.size())
@@ -93,7 +94,7 @@ res_sunet = np.squeeze(res_sunet.permute(0, 2, 3, 1).cpu().detach().numpy())
 x_test = np.squeeze(x_test.permute(0, 2, 3, 1).cpu().detach().numpy())
 y_test = np.squeeze(y_test.permute(0, 2, 3, 1).cpu().detach().numpy())
 
-with open(dat_dir+'outputs/sunet_ep-100.pkl', 'wb') as f1:
+with open(dat_dir+'outputs/sunet_ep-241.pkl', 'wb') as f1:
     pickle.dump(res_sunet, f1, protocol=pickle.HIGHEST_PROTOCOL)
 
 
@@ -150,8 +151,7 @@ def nmse(signal_1, signal_2):
     return np.around(np.linalg.norm(signal_2 - signal_1, axis=(0,1))**2 / np.linalg.norm(signal_1, axis=(0,1))**2, 2)
 
 
-selection = [899,932,938,962] #,1004,1094,1210,1283,1302,1308,1356,1382,1392,1574,1623,1688,1742,1838,1899,1954,2048,
-            #  2132,2157,29,34,47,52,81,163,164,185,192,239,241,300,319,324,365,367,373,378,381,403,455,647]
+selection = [899,932,938,962,1004,1094,1210,1283] 
 
 for i in range(len(selection)):
     fig = plot_comparison(np.expand_dims(noisy[selection][i], 0),

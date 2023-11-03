@@ -28,8 +28,13 @@ MODEL:
 
 # Optimization arguments.
 OPTIM:
+<<<<<<< HEAD
   BATCH: 16 #32
   EPOCHS: 400 #200
+=======
+  BATCH: 16
+  EPOCHS: 500
+>>>>>>> 85c7025971efbd7c3b6787a583d149d923679525
   # EPOCH_DECAY: [10]
   LR_INITIAL: 1e-3 #2e-4
   LR_MIN: 1e-5 #1e-6
@@ -37,9 +42,14 @@ OPTIM:
 
 TRAINING:
   VAL_AFTER_EVERY: 1
-  RESUME: False
+  RESUME: True
   TRAIN_PS: 128
   VAL_PS: 128 
+<<<<<<< HEAD
   TRAIN_DIR: './datasets/Denoising_DIV2K/train'       # path to training data
   VAL_DIR: './datasets/Denoising_DIV2K/test'          # path to validation data
+=======
+  # TRAIN_DIR: './datasets/Denoising_DIV2K/train'       # path to training data
+  # VAL_DIR: './datasets/Denoising_DIV2K/test' # path to validation data
+>>>>>>> 85c7025971efbd7c3b6787a583d149d923679525
   SAVE_DIR: '/home/users/a/akhaury/scratch/SingleChannel_Deconv/Trained_Models/SUNet'           # path to save models and images
