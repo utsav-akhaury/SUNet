@@ -1,0 +1,27 @@
+# This file may be used to create a conda environment using:
+# $ conda create --name sunet --file <this file>
+
+name: sunet
+channels:
+  - pytorch
+  - conda-forge
+dependencies:
+  - einops=0.7.0
+  - joblib=1.2.0
+  - matplotlib=3.6.1
+  - natsort=8.4.0
+  - numpy=1.24.3
+  - pillow=9.2.0
+  - python=3.10.6
+  - pytorch=1.12.0
+  - pyyaml=6.0
+  - scikit-image=0.19.2
+  - scipy=1.10.0
+  - seaborn=0.11.2
+  - timm=0.6.12
+  - torchvision=0.13.0
+  - jupyter
+
+  - pip:
+    - thop==0.1.1.post2209072238 
+    - tqdm
