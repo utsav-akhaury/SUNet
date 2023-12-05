@@ -28,7 +28,7 @@ Installation
 
         conda env create -f conda_env.yml
  
-4) Download the pre-trained PyTorch model from this `link <https://github.com/utsav-akhaury/SUNet.git>`_.
+4) Download the pre-trained PyTorch model from this `link <https://drive.google.com/file/d/1-uhVcGmIQtBepu64E9lmyV9X5cwEItwk/view?usp=sharing>`_.
 
 
 Code Overview
@@ -54,6 +54,7 @@ Code Overview
 * ``decon_sunet.py`` is the main script containing the deconvolution functions.
 * ``README.rst`` contains getting started information on installation and usage.
 * ``tutorial.ipynb`` is a Jupyter notebook that guides you through the deconvolution process.
+
 
 Usage
 =====
