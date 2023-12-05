@@ -41,18 +41,18 @@ Code Overview
             hst.npy
             psf_vlt.npy
             vlt.npy
-        conda_env.yml
-        decon_sunet.py
         README.rst
+        conda_env.yml
+        deconv_sunet.py
         tutorial.ipynb
 
 * ``Data`` is the directory containing the test images used in the tutorial notebook.
     * ``Data/vlt.npy`` is a sample VLT image to be deconvolved.
     * ``Data/psf_vlt.npy`` is the PSF for the VLT image.
     * ``Data/hst.npy`` the corresponding HST image for comparison.
+* ``README.rst`` contains getting started information on installation and usage.
 * ``conda_env.yml`` is a configuration file for Anaconda (Miniconda) that sets up a Python environment with all the required Python packages for using the SUNet Deconvolution code.
 * ``decon_sunet.py`` is the main script containing the deconvolution functions.
-* ``README.rst`` contains getting started information on installation and usage.
 * ``tutorial.ipynb`` is a Jupyter notebook that guides you through the deconvolution process.
 
 
