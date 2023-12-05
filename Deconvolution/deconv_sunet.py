@@ -1,6 +1,6 @@
-r"""SUNet Deconvolution for Astronomical Images
+r"""Ground-based Image Deconvolution with Swin Transformer UNet (SUNet)
 
-This script uses an SUNet is to denoise images that were deconvolved using a Wiener filter.
+This script uses an SUNet to denoise images that were deconvolved using Tikhonov regularisation.
 
 Inspired by:
 
