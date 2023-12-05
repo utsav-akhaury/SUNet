@@ -46,7 +46,7 @@ Code Overview
         README.rst
         tutorial.ipynb
 
-* ``Data/`` is a directory containing the test images.
+* ``Data`` is the directory containing the test images used in the tutorial notebook.
     * ``Data/vlt.npy`` is a sample VLT image to be deconvolved.
     * ``Data/psf_vlt.npy`` is the PSF for the VLT image.
     * ``Data/hst.npy`` the corresponding HST image for comparison.
