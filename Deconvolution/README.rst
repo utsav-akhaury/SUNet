@@ -28,7 +28,7 @@ Installation
 
         conda env create -f conda_env.yml
  
-4) Download the pre-trained PyTorch model from this `link <https://drive.google.com/file/d/1-uhVcGmIQtBepu64E9lmyV9X5cwEItwk/view?usp=sharing>`_.
+4) Download the pre-trained PyTorch model from this `link <https://doi.org/10.5281/zenodo.10287213>`_.
 
 
 Code Overview
