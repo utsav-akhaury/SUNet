@@ -169,7 +169,6 @@ def deconv_sunet(noisy,
                                            rfft_psf[ch], 
                                            balance)
 
-
     # Import SUNet
     sys.path.insert(1, SUNet_path)
     from model.SUNet import SUNet_model
@@ -184,8 +183,9 @@ def deconv_sunet(noisy,
     # Convert to torch tensor
     input_ = torch.tensor(tikho_deconv).float()
 
-    model_img = tikho_deconv.shape[2]
-    stride = model_img//2
+    # Do not change these parameters. They are set to the default values used while training the network.
+    model_img = 128
+    stride = 128
 
     def overlapped_square(timg, kernel=model_img, stride=stride):
         patch_images = []
