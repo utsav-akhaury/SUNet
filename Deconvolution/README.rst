@@ -4,7 +4,7 @@ Ground-based Image Deconvolution with Swin Transformer UNet (SUNet)
 
 We introduce a fast and efficient two-step deep learning-based deconvolution framework. The first step involves a Tikhonov deconvolution, followed by denoising with a Swin Transformer UNet (SUNet) architecture proposed by `Fan et al. (2022) <https://arxiv.org/pdf/2202.14009.pdf>`_. 
 
-This deconvolution method can be used to recover small-scale structures at high spatial resolution from ground-based multi-band observations. The algorithm is described in detail in `Akhaury et al. (2024) <https://arxiv.org/pdf/2405.07842>`_.   
+This deconvolution method can be used to recover small-scale structures at high spatial resolution from ground-based multi-band observations. The algorithm is described in detail in `Akhaury et al. (2024) <https://doi.org/10.1051/0004-6361/202449495>`_.   
 
 This is a fork of the `original implementation <https://github.com/FanChiMao/SUNet>`_ of the SUNet code in PyTorch by `Fan et al. (2022) <https://arxiv.org/pdf/2202.14009.pdf>`_. We thank the authors for making the code publicly available.
 
