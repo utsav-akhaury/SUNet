@@ -9,9 +9,10 @@ For each object, we would require:
 
 1) A noisy ground-based image
 
-2) A target space-based image
+2) The corresponding ground-based PSF
 
-3) The corresponding PSF
+3) A target space-based image (JWST)
+
 
 Specifications
 ==============
