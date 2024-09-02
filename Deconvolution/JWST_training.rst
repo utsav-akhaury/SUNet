@@ -26,7 +26,7 @@ Specifications
     * Previoudly, our PSF had an FWHM of ``~0.75″`` for the entire training sample. 
 * For each object, a corresponding normalized PSF is required, with a flux of ``1``.
     * i.e. the sum of all the pixel values should be ``1``.
-* To filter objects of interest from the HST catalogue, we previously chose the following criteria (The last 2 conditions ensure that we exclude stars or point-sources in our dataset):
+* To filter objects of interest from the HST catalogue, we previously chose the following criteria (the last 2 conditions ensure that we exclude stars or point-sources in our dataset):
     * ``MAG_AUTO < 26`` (AB magnitude in SExtractor “AUTO” aperture)
     * ``Flux_Radius_80 > 10`` (80% enclosed flux radius in pixels)
     * ``FWHM > 10`` (full width at half maximum in pixels)
