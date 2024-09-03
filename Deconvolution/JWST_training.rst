@@ -13,6 +13,8 @@ For each object, we would require:
 
 3) A target space-based image (JWST)
 
+We would need atleast ``~25,000`` objects for the training set.
+
 
 Specifications
 ==============
