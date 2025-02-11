@@ -107,7 +107,7 @@ print('==> Loading datasets')
 
 # Read Saved Batches   
 x_train = np.load('/home/users/a/akhaury/scratch/SingleChannel_Deconv/x_train.npy')
-x_hat_train = np.load('/home/users/a/akhaury/scratch/SingleChannel_Deconv/x_hat_train.npy')
+y_train = np.load('/home/users/a/akhaury/scratch/SingleChannel_Deconv/y_train.npy')
 
 # Normalize targets
 x_train = x_train - np.mean(x_train, axis=(1,2), keepdims=True)
@@ -115,17 +115,17 @@ norm_fact = np.max(x_train, axis=(1,2), keepdims=True)
 x_train /= norm_fact
 
 # Normalize & scale tikho inputs
-x_hat_train = x_hat_train - np.mean(x_hat_train, axis=(1,2), keepdims=True)
-x_hat_train /= norm_fact
+y_train = y_train - np.mean(y_train, axis=(1,2), keepdims=True)
+y_train /= norm_fact
 
 # NCHW convention
-x_hat_train = np.moveaxis(x_hat_train, -1, 1)
+y_train = np.moveaxis(y_train, -1, 1)
 x_train = np.moveaxis(x_train, -1, 1)
 
 # Convert to torch tensor
-x_hat_train = torch.tensor(x_hat_train)
+y_train = torch.tensor(y_train)
 x_train = torch.tensor(x_train)
-print(x_hat_train.size(), x_train.size())
+print(y_train.size(), x_train.size())
 
 free_gpu_cache() 
 
@@ -174,14 +174,14 @@ for epoch in range(start_epoch, OPT['EPOCHS'] + 1):
     train_id = 1
 
     # Randomly split train-validation set for every epoch
-    n_obj = x_hat_train.size()[0]
+    n_obj = y_train.size()[0]
     n_train = np.int16(0.9*n_obj)
 
     ind = np.arange(n_obj)
     np.random.shuffle(ind)
 
-    train_dataset = TensorDataset(x_train[ind][:n_train], x_hat_train[ind][:n_train])
-    val_dataset = TensorDataset(x_train[ind][n_train:], x_hat_train[ind][n_train:])
+    train_dataset = TensorDataset(x_train[ind][:n_train], y_train[ind][:n_train])
+    val_dataset = TensorDataset(x_train[ind][n_train:], y_train[ind][n_train:])
 
     train_loader = DataLoader(dataset=train_dataset, batch_size=OPT['BATCH'],
                             shuffle=True, num_workers=0, drop_last=False)
