@@ -27,21 +27,9 @@ import gc
 # from GPUtil import showUtilization as gpu_usage
 # from numba import cuda as cd
 
-def free_gpu_cache():
-    # print("Initial GPU Usage")
-    # gpu_usage()                             
-
+def free_gpu_cache():                          
     gc.collect()
     torch.cuda.empty_cache()
-
-    # cd.select_device(0)
-    # cd.close()
-    # # dvc = cd.get_current_device()
-    # # dvc.reset()
-    # cd.select_device(0)
-
-    # print("GPU Usage after emptying the cache")
-    # gpu_usage()
 
 free_gpu_cache() 
 
@@ -69,9 +57,6 @@ model_restored.cuda()
 mode = opt['MODEL']['MODE']
 
 model_dir = os.path.join(Train['SAVE_DIR'], mode, 'models')
-# utils.mkdir(model_dir)
-# train_dir = Train['TRAIN_DIR']
-# val_dir = Train['VAL_DIR']
 
 ## GPU
 gpus = ','.join([str(i) for i in opt['GPU']])
@@ -119,35 +104,28 @@ L1_loss = nn.L1Loss()
 
 ## DataLoaders
 print('==> Loading datasets')
-# train_dataset = get_training_data(train_dir, {'patch_size': Train['TRAIN_PS']})
-# train_loader = DataLoader(dataset=train_dataset, batch_size=OPT['BATCH'],
-#                           shuffle=True, num_workers=0, drop_last=False)
-# val_dataset = get_validation_data(val_dir, {'patch_size': Train['VAL_PS']})
-# val_loader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=False, num_workers=0,
-#                         drop_last=False)
 
 # Read Saved Batches   
 x_train = np.load('/home/users/a/akhaury/scratch/SingleChannel_Deconv/x_train.npy')
-y_train = np.load('/home/users/a/akhaury/scratch/SingleChannel_Deconv/y_train.npy')
-
+x_hat_train = np.load('/home/users/a/akhaury/scratch/SingleChannel_Deconv/x_hat_train.npy')
 
 # Normalize targets
-y_train = y_train - np.mean(y_train, axis=(1,2), keepdims=True)
-norm_fact = np.max(y_train, axis=(1,2), keepdims=True) 
-y_train /= norm_fact
-
-# Normalize & scale tikho inputs
 x_train = x_train - np.mean(x_train, axis=(1,2), keepdims=True)
+norm_fact = np.max(x_train, axis=(1,2), keepdims=True) 
 x_train /= norm_fact
 
+# Normalize & scale tikho inputs
+x_hat_train = x_hat_train - np.mean(x_hat_train, axis=(1,2), keepdims=True)
+x_hat_train /= norm_fact
+
 # NCHW convention
+x_hat_train = np.moveaxis(x_hat_train, -1, 1)
 x_train = np.moveaxis(x_train, -1, 1)
-y_train = np.moveaxis(y_train, -1, 1)
 
 # Convert to torch tensor
+x_hat_train = torch.tensor(x_hat_train)
 x_train = torch.tensor(x_train)
-y_train = torch.tensor(y_train)
-print(x_train.size(), y_train.size())
+print(x_hat_train.size(), x_train.size())
 
 free_gpu_cache() 
 
@@ -196,14 +174,14 @@ for epoch in range(start_epoch, OPT['EPOCHS'] + 1):
     train_id = 1
 
     # Randomly split train-validation set for every epoch
-    n_obj = x_train.size()[0]
+    n_obj = x_hat_train.size()[0]
     n_train = np.int16(0.9*n_obj)
 
     ind = np.arange(n_obj)
     np.random.shuffle(ind)
 
-    train_dataset = TensorDataset(y_train[ind][:n_train], x_train[ind][:n_train])
-    val_dataset = TensorDataset(y_train[ind][n_train:], x_train[ind][n_train:])
+    train_dataset = TensorDataset(x_train[ind][:n_train], x_hat_train[ind][:n_train])
+    val_dataset = TensorDataset(x_train[ind][n_train:], x_hat_train[ind][n_train:])
 
     train_loader = DataLoader(dataset=train_dataset, batch_size=OPT['BATCH'],
                             shuffle=True, num_workers=0, drop_last=False)
@@ -214,7 +192,6 @@ for epoch in range(start_epoch, OPT['EPOCHS'] + 1):
     free_gpu_cache() 
 
     model_restored.train()
-    # for i, data in enumerate(tqdm(train_loader), 0):
     for i, data in enumerate(train_loader, 0):
         # Forward propagation
         for param in model_restored.parameters():
