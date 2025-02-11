@@ -23,30 +23,30 @@ f.close()
 
 # Norm
 noise_sigma_orig = dico['noisemap']
-x_test = dico['inputs_tikho_laplacian']
-y_test = dico['targets']
+y_test = dico['inputs_tikho_laplacian']
+x_test = dico['targets']
 noisy = dico['noisy']
 
 # Normalize targets
-y_test = y_test - np.mean(y_test, axis=(1,2), keepdims=True)
-norm_fact = np.max(y_test, axis=(1,2), keepdims=True) 
-y_test /= norm_fact
+x_test = x_test - np.mean(x_test, axis=(1,2), keepdims=True)
+norm_fact = np.max(x_test, axis=(1,2), keepdims=True) 
+x_test /= norm_fact
 
 # Normalize & scale tikho inputs
-x_test = x_test - np.mean(x_test, axis=(1,2), keepdims=True)
-x_test /= norm_fact
+y_test = y_test - np.mean(y_test, axis=(1,2), keepdims=True)
+y_test /= norm_fact
 
 # Normalize & scale noisy images
 noisy = noisy - np.mean(noisy, axis=(1,2), keepdims=True)
 noisy /= norm_fact
 
 # NCHW convention
-x_test = np.expand_dims(x_test, 1)
 y_test = np.expand_dims(y_test, 1)
+x_test = np.expand_dims(x_test, 1)
 
 # Convert to torch tensor
-x_test = torch.tensor(x_test)
 y_test = torch.tensor(y_test)
+x_test = torch.tensor(x_test)
 
 
 # Load model
@@ -72,18 +72,18 @@ load_checkpoint(model, model_dir+'model_bestSSIM_ep-300_bs-16_ps-1.pth')
 model.eval()
 
 
-res_sunet = torch.zeros(x_test.size())
+res_sunet = torch.zeros(y_test.size())
 print(res_sunet.size())
 
 process_bs = 100
-for i in range(0, x_test.size()[0], process_bs):
+for i in range(0, y_test.size()[0], process_bs):
 
-    if i+process_bs > x_test.size()[0]:
-        ind = x_test.size()[0]
+    if i+process_bs > y_test.size()[0]:
+        ind = y_test.size()[0]
     else:
         ind = i + process_bs
 
-    input_ = x_test[i:ind].cuda()
+    input_ = y_test[i:ind].cuda()
     print(input_.size())
 
     with torch.no_grad():
@@ -91,8 +91,8 @@ for i in range(0, x_test.size()[0], process_bs):
 
 # Convert arrays
 res_sunet = np.squeeze(res_sunet.permute(0, 2, 3, 1).cpu().detach().numpy())
-x_test = np.squeeze(x_test.permute(0, 2, 3, 1).cpu().detach().numpy())
 y_test = np.squeeze(y_test.permute(0, 2, 3, 1).cpu().detach().numpy())
+x_test = np.squeeze(x_test.permute(0, 2, 3, 1).cpu().detach().numpy())
 
 with open(dat_dir+'outputs/sunet_ep-241.pkl', 'wb') as f1:
     pickle.dump(res_sunet, f1, protocol=pickle.HIGHEST_PROTOCOL)
@@ -156,10 +156,10 @@ selection = [899,932,938,962,1004,1094,1210,1283]
 for i in range(len(selection)):
     fig = plot_comparison(np.expand_dims(noisy[selection][i], 0),
                           np.expand_dims(res_sunet[selection][i], 0), 
-                          np.expand_dims(y_test[selection][i], 0),
+                          np.expand_dims(x_test[selection][i], 0),
                           dico['psf'][0],
                           labels = ['Convolved Noisy Image',                                
-                                    'SUNet  |  NMSE = {}'.format(nmse(y_test[selection][i], res_sunet[selection][i])), 
+                                    'SUNet  |  NMSE = {}'.format(nmse(x_test[selection][i], res_sunet[selection][i])), 
                                     'Target Image - {}'.format(selection[i]),
                                     'Error (Output - Target)',
                                     'Residual (Noisy - PSF * Ouput)'], figsize=(40,7))
