@@ -1,5 +1,5 @@
 # This file may be used to create a conda environment using:
-# $ conda create --name sunet --file <this file>
+# conda env create -f conda_env.yml
 
 name: sunet
 channels:
