@@ -1,28 +1,5 @@
 import torch
-import os
 from collections import OrderedDict
-
-
-def freeze(model):
-    for p in model.parameters():
-        p.requires_grad = False
-
-
-def unfreeze(model):
-    for p in model.parameters():
-        p.requires_grad = True
-
-
-def is_frozen(model):
-    x = [p.requires_grad for p in model.parameters()]
-    return not all(x)
-
-
-def save_checkpoint(model_dir, state, session):
-    epoch = state['epoch']
-    model_out_path = os.path.join(model_dir, "model_epoch_{}_{}.pth".format(epoch, session))
-    torch.save(state, model_out_path)
-
 
 def load_checkpoint(model, weights):
     checkpoint = torch.load(weights)

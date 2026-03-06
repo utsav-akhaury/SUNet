@@ -1,11 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.utils.checkpoint as checkpoint
-from einops import rearrange
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 from thop import profile
 
-class Mlp(nn.Module):
+class MLP(nn.Module):
     def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
         super().__init__()
         out_features = out_features or in_features
@@ -74,26 +73,24 @@ class WindowAttention(nn.Module):
 
         super().__init__()
         self.dim = dim
-        self.window_size = window_size  # Wh, Ww
+        self.window_size = window_size
         self.num_heads = num_heads
         head_dim = dim // num_heads
         self.scale = qk_scale or head_dim ** -0.5
 
-        # define a parameter table of relative position bias
         self.relative_position_bias_table = nn.Parameter(
-            torch.zeros((2 * window_size[0] - 1) * (2 * window_size[1] - 1), num_heads))  # 2*Wh-1 * 2*Ww-1, nH
+            torch.zeros((2 * window_size[0] - 1) * (2 * window_size[1] - 1), num_heads))
 
-        # get pair-wise relative position index for each token inside the window
         coords_h = torch.arange(self.window_size[0])
         coords_w = torch.arange(self.window_size[1])
-        coords = torch.stack(torch.meshgrid([coords_h, coords_w]))  # 2, Wh, Ww
-        coords_flatten = torch.flatten(coords, 1)  # 2, Wh*Ww
-        relative_coords = coords_flatten[:, :, None] - coords_flatten[:, None, :]  # 2, Wh*Ww, Wh*Ww
-        relative_coords = relative_coords.permute(1, 2, 0).contiguous()  # Wh*Ww, Wh*Ww, 2
-        relative_coords[:, :, 0] += self.window_size[0] - 1  # shift to start from 0
+        coords = torch.stack(torch.meshgrid([coords_h, coords_w])) 
+        coords_flatten = torch.flatten(coords, 1)
+        relative_coords = coords_flatten[:, :, None] - coords_flatten[:, None, :]
+        relative_coords = relative_coords.permute(1, 2, 0).contiguous()
+        relative_coords[:, :, 0] += self.window_size[0] - 1
         relative_coords[:, :, 1] += self.window_size[1] - 1
         relative_coords[:, :, 0] *= 2 * self.window_size[1] - 1
-        relative_position_index = relative_coords.sum(-1)  # Wh*Ww, Wh*Ww
+        relative_position_index = relative_coords.sum(-1)
         self.register_buffer("relative_position_index", relative_position_index)
 
         self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
@@ -112,14 +109,14 @@ class WindowAttention(nn.Module):
         """
         B_, N, C = x.shape
         qkv = self.qkv(x).reshape(B_, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
-        q, k, v = qkv[0], qkv[1], qkv[2]  # make torchscript happy (cannot use tensor as tuple)
+        q, k, v = qkv[0], qkv[1], qkv[2]
 
         q = q * self.scale
         attn = (q @ k.transpose(-2, -1))
 
         relative_position_bias = self.relative_position_bias_table[self.relative_position_index.view(-1)].view(
-            self.window_size[0] * self.window_size[1], self.window_size[0] * self.window_size[1], -1)  # Wh*Ww,Wh*Ww,nH
-        relative_position_bias = relative_position_bias.permute(2, 0, 1).contiguous()  # nH, Wh*Ww, Wh*Ww
+            self.window_size[0] * self.window_size[1], self.window_size[0] * self.window_size[1], -1)
+        relative_position_bias = relative_position_bias.permute(2, 0, 1).contiguous()
         attn = attn + relative_position_bias.unsqueeze(0)
 
         if mask is not None:
@@ -141,15 +138,10 @@ class WindowAttention(nn.Module):
         return f'dim={self.dim}, window_size={self.window_size}, num_heads={self.num_heads}'
 
     def flops(self, N):
-        # calculate flops for 1 window with token length of N
         flops = 0
-        # qkv = self.qkv(x)
         flops += N * self.dim * 3 * self.dim
-        # attn = (q @ k.transpose(-2, -1))
         flops += self.num_heads * N * (self.dim // self.num_heads) * N
-        #  x = (attn @ v)
         flops += self.num_heads * N * N * (self.dim // self.num_heads)
-        # x = self.proj(x)
         flops += N * self.dim * self.dim
         return flops
 
@@ -184,7 +176,6 @@ class SwinTransformerBlock(nn.Module):
         self.shift_size = shift_size
         self.mlp_ratio = mlp_ratio
         if min(self.input_resolution) <= self.window_size:
-            # if window size is larger than input resolution, we don't partition windows
             self.shift_size = 0
             self.window_size = min(self.input_resolution)
         assert 0 <= self.shift_size < self.window_size, "shift_size must in 0-window_size"
@@ -197,10 +188,9 @@ class SwinTransformerBlock(nn.Module):
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         self.norm2 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
-        self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
+        self.mlp = MLP(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
 
         if self.shift_size > 0:
-            # calculate attention mask for SW-MSA
             H, W = self.input_resolution
             img_mask = torch.zeros((1, H, W, 1))  # 1 H W 1
             h_slices = (slice(0, -self.window_size),
@@ -227,13 +217,11 @@ class SwinTransformerBlock(nn.Module):
     def forward(self, x):
         H, W = self.input_resolution
         B, L, C = x.shape
-        # assert L == H * W, "input feature has wrong size"
 
         shortcut = x
         x = self.norm1(x)
         x = x.view(B, H, W, C)
 
-        # cyclic shift
         if self.shift_size > 0:
             shifted_x = torch.roll(x, shifts=(-self.shift_size, -self.shift_size), dims=(1, 2))
         else:
@@ -270,14 +258,10 @@ class SwinTransformerBlock(nn.Module):
     def flops(self):
         flops = 0
         H, W = self.input_resolution
-        # norm1
         flops += self.dim * H * W
-        # W-MSA/SW-MSA
         nW = H * W / self.window_size / self.window_size
         flops += nW * self.attn.flops(self.window_size * self.window_size)
-        # mlp
         flops += 2 * H * W * self.dim * self.dim * self.mlp_ratio
-        # norm2
         flops += self.dim * H * W
         return flops
 
@@ -309,12 +293,12 @@ class PatchMerging(nn.Module):
 
         x = x.view(B, H, W, C)
 
-        x0 = x[:, 0::2, 0::2, :]  # B H/2 W/2 C
-        x1 = x[:, 1::2, 0::2, :]  # B H/2 W/2 C
-        x2 = x[:, 0::2, 1::2, :]  # B H/2 W/2 C
-        x3 = x[:, 1::2, 1::2, :]  # B H/2 W/2 C
-        x = torch.cat([x0, x1, x2, x3], -1)  # B H/2 W/2 4*C
-        x = x.view(B, -1, 4 * C)  # B H/2*W/2 4*C
+        x0 = x[:, 0::2, 0::2, :]
+        x1 = x[:, 1::2, 0::2, :]
+        x2 = x[:, 0::2, 1::2, :]
+        x3 = x[:, 1::2, 1::2, :]
+        x = torch.cat([x0, x1, x2, x3], -1)
+        x = x.view(B, -1, 4 * C)
 
         x = self.norm(x)
         x = self.reduction(x)
@@ -331,7 +315,6 @@ class PatchMerging(nn.Module):
         return flops
 
 
-# Dual up-sample
 class UpSample(nn.Module):
     def __init__(self, input_resolution, in_channels, scale_factor):
         super(UpSample, self).__init__()
@@ -374,12 +357,12 @@ class UpSample(nn.Module):
             H, W = self.input_resolution
 
         B, L, C = x.shape
-        x = x.view(B, H, W, C)  # B, H, W, C
-        x = x.permute(0, 3, 1, 2)  # B, C, H, W
-        x_p = self.up_p(x)  # pixel shuffle
-        x_b = self.up_b(x)  # bilinear
+        x = x.view(B, H, W, C)
+        x = x.permute(0, 3, 1, 2)
+        x_p = self.up_p(x)
+        x_b = self.up_b(x)
         out = self.conv(torch.cat([x_p, x_b], dim=1))
-        out = out.permute(0, 2, 3, 1)  # B, H, W, C
+        out = out.permute(0, 2, 3, 1)
         if self.factor == 2:
             out = out.view(B, -1, C // 2)
 
@@ -416,7 +399,6 @@ class BasicLayer(nn.Module):
         self.depth = depth
         self.use_checkpoint = use_checkpoint
 
-        # build blocks
         self.blocks = nn.ModuleList([
             SwinTransformerBlock(dim=dim, input_resolution=input_resolution,
                                  num_heads=num_heads, window_size=window_size,
@@ -428,7 +410,6 @@ class BasicLayer(nn.Module):
                                  norm_layer=norm_layer)
             for i in range(depth)])
 
-        # patch merging layer
         if downsample is not None:
             self.downsample = downsample(input_resolution, dim=dim, norm_layer=norm_layer)
         else:
@@ -486,7 +467,6 @@ class BasicLayer_up(nn.Module):
         self.depth = depth
         self.use_checkpoint = use_checkpoint
 
-        # build blocks
         self.blocks = nn.ModuleList([
             SwinTransformerBlock(dim=dim, input_resolution=input_resolution,
                                  num_heads=num_heads, window_size=window_size,
@@ -498,7 +478,6 @@ class BasicLayer_up(nn.Module):
                                  norm_layer=norm_layer)
             for i in range(depth)])
 
-        # patch merging layer
         if upsample is not None:
             self.upsample = UpSample(input_resolution, in_channels=dim, scale_factor=2)
         else:
@@ -547,10 +526,7 @@ class PatchEmbed(nn.Module):
 
     def forward(self, x):
         B, C, H, W = x.shape
-        # FIXME look at relaxing size constraints
-        # assert H == self.img_size[0] and W == self.img_size[1], \
-        #    f"Input image size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
-        x = self.proj(x).flatten(2).transpose(1, 2)  # B Ph*Pw C
+        x = self.proj(x).flatten(2).transpose(1, 2)
         if self.norm is not None:
             x = self.norm(x)
         return x
@@ -611,8 +587,6 @@ class SUNet(nn.Module):
         self.patch_size = patch_size  # <=== #
         self.image_size = img_size  # <=== #
         
-
-        # split image into non-overlapping patches
         self.patch_embed = PatchEmbed(
             img_size=img_size, patch_size=patch_size, in_chans=embed_dim, embed_dim=embed_dim,
             norm_layer=norm_layer if self.patch_norm else None)
@@ -620,17 +594,14 @@ class SUNet(nn.Module):
         patches_resolution = self.patch_embed.patches_resolution
         self.patches_resolution = patches_resolution
 
-        # absolute position embedding
         if self.ape:
             self.absolute_pos_embed = nn.Parameter(torch.zeros(1, num_patches, embed_dim))
             trunc_normal_(self.absolute_pos_embed, std=.02)
 
         self.pos_drop = nn.Dropout(p=drop_rate)
 
-        # stochastic depth
-        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]  # stochastic depth decay rule
+        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]
 
-        # build encoder and bottleneck layers
         self.layers = nn.ModuleList()
         for i_layer in range(self.num_layers):
             layer = BasicLayer(dim=int(embed_dim * 2 ** i_layer),
@@ -648,7 +619,6 @@ class SUNet(nn.Module):
                                use_checkpoint=use_checkpoint)
             self.layers.append(layer)
 
-        # build decoder layers
         self.layers_up = nn.ModuleList()
         self.concat_back_dim = nn.ModuleList()
         for i_layer in range(self.num_layers):
@@ -680,12 +650,10 @@ class SUNet(nn.Module):
         self.norm = norm_layer(self.num_features)
         self.norm_up = norm_layer(self.embed_dim)
 
-        if self.final_upsample == "bilinear":  # <=== #
-            # self.up = UpSample(input_resolution=(img_size // patch_size, img_size // patch_size),
-            # in_channels=embed_dim, scale_factor=4)  # <=== #
-            self.up = nn.Upsample(scale_factor=patch_size, mode=final_upsample, align_corners=False)  # <=== #
+        if self.final_upsample == "bilinear":
+            self.up = nn.Upsample(scale_factor=patch_size, mode=final_upsample, align_corners=False)
             self.output = nn.Conv2d(in_channels=embed_dim, out_channels=self.out_chans, kernel_size=3, stride=1,
-                                    padding=1, bias=False)  # kernel = 1
+                                    padding=1, bias=False)
 
         self.apply(self._init_weights)
 
@@ -706,7 +674,6 @@ class SUNet(nn.Module):
     def no_weight_decay_keywords(self):
         return {'relative_position_bias_table'}
 
-    # Encoder and Bottleneck
     def forward_features(self, x):
         residual = x
         x = self.patch_embed(x)
@@ -723,33 +690,20 @@ class SUNet(nn.Module):
 
         return x, residual, x_downsample
 
-    # Dencoder and Skip connection
     def forward_up_features(self, x, x_downsample):
         for inx, layer_up in enumerate(self.layers_up):
             if inx == 0:
                 x = layer_up(x)
             else:
-                x = torch.cat([x, x_downsample[3 - inx]], -1)  # concat last dimension
+                x = torch.cat([x, x_downsample[3 - inx]], -1)
                 x = self.concat_back_dim[inx](x)
                 x = layer_up(x)
 
-        x = self.norm_up(x)  # B L C
+        x = self.norm_up(x)
 
         return x
 
-    # def up_x4(self, x):  # <=== #
-    #     H, W = self.patches_resolution
-    #     B, L, C = x.shape
-    #     assert L == H * W, "input features has wrong size"
-    #
-    #     if self.final_upsample == "bilinear":
-    #         x = self.up(x)
-    #         # x = x.view(B, 4 * H, 4 * W, -1)
-    #         x = x.permute(0, 3, 1, 2)  # B,C,H,W
-    #
-    #     return x
-
-    def patch_unenbedded(self, x):  # <=== #
+    def patch_unenbedded(self, x):
         H, W = self.patches_resolution
         B, L, C = x.shape
         assert L == H * W, "input features has wrong size"
@@ -757,7 +711,7 @@ class SUNet(nn.Module):
         if self.final_upsample == 'bilinear':
             factor = self.patch_size
             x = x.view(B, H, W, -1)
-            x = x.permute(0, 3, 1, 2)  # B,C,H,W
+            x = x.permute(0, 3, 1, 2)
             x = self.up(x)
 
         return x
@@ -766,10 +720,8 @@ class SUNet(nn.Module):
         x = self.conv_first(x)
         x, residual, x_downsample = self.forward_features(x)
         x = self.forward_up_features(x, x_downsample)
-        # x = self.up_x4(x)  # <=== #
-        x = self.patch_unenbedded(x)  # <=== #
+        x = self.patch_unenbedded(x)
         out = self.output(x)
-        # x = x + residual
         return out
 
     def flops(self):
@@ -795,11 +747,9 @@ if __name__ == '__main__':
                   drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
                   norm_layer=nn.LayerNorm, ape=False, patch_norm=True,
                   use_checkpoint=False, final_upsample="bilinear")  # <=== # # .cuda()
-    # print(model)
     print('input image size: (%d, %d)' % (height, width))
     print('FLOPs: %.4f G' % (model.flops() / 1e9))
     print('model parameters: ', network_parameters(model))
-    # x = model(x)
     print('output image size: ', x.shape)
     flops, params = profile(model, (x,))
     print(flops)
