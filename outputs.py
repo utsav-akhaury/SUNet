@@ -2,7 +2,7 @@ import numpy as np
 import pickle
 import torch
 from collections import OrderedDict
-from model.SUNet import SUNet_model
+from model.SUNet_interface import SUNet_model
 import yaml
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable

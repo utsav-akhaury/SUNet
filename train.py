@@ -5,6 +5,7 @@ from this import d
 import torch
 import yaml
 
+from Deconvolution.deconv_sunet import instantiate_sunet_from_config
 from utils import network_parameters
 import torch.nn as nn
 import torch.optim as optim
@@ -21,7 +22,6 @@ import random
 from warmup_scheduler import GradualWarmupScheduler
 # from tqdm import tqdm
 from tensorboardX import SummaryWriter
-from model.SUNet import SUNet_model
 
 import gc
 # from GPUtil import showUtilization as gpu_usage
@@ -43,20 +43,20 @@ torch.cuda.manual_seed_all(1234)
 ## Load yaml configuration file
 with open('training.yaml', 'r') as config:
     opt = yaml.safe_load(config)
-Train = opt['TRAINING']
-OPT = opt['OPTIM']
-SUNet = opt['SWINUNET']
+train_config = opt['TRAINING']
+optim_config = opt['OPTIM']
+sunet_config = opt['SWINUNET']
 
 ## Build Model
 print('==> Build the model')
-model_restored = SUNet_model(opt)
+model_restored = instantiate_sunet_from_config(opt)
 p_number = network_parameters(model_restored)
 model_restored.cuda()
 
 ## Training model path direction
 mode = opt['MODEL']['MODE']
 
-model_dir = os.path.join(Train['SAVE_DIR'], mode, 'models')
+model_dir = os.path.join(train_config['SAVE_DIR'], mode, 'models')
 
 ## GPU
 gpus = ','.join([str(i) for i in opt['GPU']])
@@ -69,24 +69,24 @@ if len(device_ids) > 1:
     model_restored = nn.DataParallel(model_restored, device_ids=device_ids)
 
 ## Log
-log_dir = os.path.join(Train['SAVE_DIR'], mode, 'log')
+log_dir = os.path.join(train_config['SAVE_DIR'], mode, 'log')
 utils.mkdir(log_dir)
 writer = SummaryWriter(log_dir=log_dir, filename_suffix=f'_{mode}')
 
 ## Optimizer
 start_epoch = 1
-new_lr = float(OPT['LR_INITIAL'])
+new_lr = float(optim_config['LR_INITIAL'])
 optimizer = optim.Adam(model_restored.parameters(), lr=new_lr, betas=(0.9, 0.999), eps=1e-8)
 
 ## Scheduler (Strategy)
 warmup_epochs = 3
-scheduler_cosine = optim.lr_scheduler.CosineAnnealingLR(optimizer, OPT['EPOCHS'] - warmup_epochs,
-                                                        eta_min=float(OPT['LR_MIN']))
+scheduler_cosine = optim.lr_scheduler.CosineAnnealingLR(optimizer, optim_config['EPOCHS'] - warmup_epochs,
+                                                        eta_min=float(optim_config['LR_MIN']))
 scheduler = GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=warmup_epochs, after_scheduler=scheduler_cosine)
 scheduler.step()
 
 ## Resume (Continue training by a pretrained model)
-if Train['RESUME']:
+if train_config['RESUME']:
     path_chk_rest = utils.get_last_path(model_dir, '_latest_ep-400_bs-16_ps-1.pth')
     utils.load_checkpoint(model_restored, path_chk_rest)
     start_epoch = utils.load_start_epoch(path_chk_rest) + 1
@@ -151,12 +151,12 @@ def augmentation(im, seed):
 print(f'''==> Training details:
 ------------------------------------------------------------------
     Restoration mode:   {mode}
-    Train patches size: {str(Train['TRAIN_PS']) + 'x' + str(Train['TRAIN_PS'])}
-    Val patches size:   {str(Train['VAL_PS']) + 'x' + str(Train['VAL_PS'])}
+    Train patches size: {str(train_config['TRAIN_PS']) + 'x' + str(train_config['TRAIN_PS'])}
+    Val patches size:   {str(train_config['VAL_PS']) + 'x' + str(train_config['VAL_PS'])}
     Model parameters:   {p_number}
-    Start/End epochs:   {str(start_epoch) + '~' + str(OPT['EPOCHS'])}
-    Batch sizes:        {OPT['BATCH']}
-    Learning rate:      {OPT['LR_INITIAL']}
+    Start/End epochs:   {str(start_epoch) + '~' + str(optim_config['EPOCHS'])}
+    Batch sizes:        {optim_config['BATCH']}
+    Learning rate:      {optim_config['LR_INITIAL']}
     GPU:                {'GPU' + str(device_ids)}''')
 print('------------------------------------------------------------------')
 
@@ -168,7 +168,7 @@ best_epoch_psnr = 0
 best_epoch_ssim = 0
 total_start_time = time.time()
 
-for epoch in range(start_epoch, OPT['EPOCHS'] + 1):
+for epoch in range(start_epoch, optim_config['EPOCHS'] + 1):
     epoch_start_time = time.time()
     epoch_loss = 0
     train_id = 1
@@ -183,7 +183,7 @@ for epoch in range(start_epoch, OPT['EPOCHS'] + 1):
     train_dataset = TensorDataset(x_train[ind][:n_train], y_train[ind][:n_train])
     val_dataset = TensorDataset(x_train[ind][n_train:], y_train[ind][n_train:])
 
-    train_loader = DataLoader(dataset=train_dataset, batch_size=OPT['BATCH'],
+    train_loader = DataLoader(dataset=train_dataset, batch_size=optim_config['BATCH'],
                             shuffle=True, num_workers=0, drop_last=False)
     val_loader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=False, num_workers=0,
                             drop_last=False)
@@ -221,7 +221,7 @@ for epoch in range(start_epoch, OPT['EPOCHS'] + 1):
         epoch_loss += loss.item()
 
     ## Evaluation (Validation)
-    if epoch % Train['VAL_AFTER_EVERY'] == 0:
+    if epoch % train_config['VAL_AFTER_EVERY'] == 0:
         model_restored.eval()
         psnr_val_rgb = []
         ssim_val_rgb = []
@@ -250,7 +250,7 @@ for epoch in range(start_epoch, OPT['EPOCHS'] + 1):
             torch.save({'epoch': epoch,
                         'state_dict': model_restored.state_dict(),
                         'optimizer': optimizer.state_dict()
-                        }, os.path.join(model_dir, "model_bestPSNR_ep-{}_bs-{}_ps-{}.pth".format(OPT['EPOCHS'], OPT['BATCH'], SUNet['PATCH_SIZE']))) 
+                        }, os.path.join(model_dir, "model_bestPSNR_ep-{}_bs-{}_ps-{}.pth".format(optim_config['EPOCHS'], optim_config['BATCH'], sunet_config['PATCH_SIZE']))) 
         print("[epoch %d PSNR: %.4f --- best_epoch %d Best_PSNR %.4f]" % (
             epoch, psnr_val_rgb, best_epoch_psnr, best_psnr))
 
@@ -261,7 +261,7 @@ for epoch in range(start_epoch, OPT['EPOCHS'] + 1):
             torch.save({'epoch': epoch,
                         'state_dict': model_restored.state_dict(),
                         'optimizer': optimizer.state_dict()
-                        }, os.path.join(model_dir, "model_bestSSIM_ep-{}_bs-{}_ps-{}.pth".format(OPT['EPOCHS'], OPT['BATCH'], SUNet['PATCH_SIZE'])))
+                        }, os.path.join(model_dir, "model_bestSSIM_ep-{}_bs-{}_ps-{}.pth".format(optim_config['EPOCHS'], optim_config['BATCH'], sunet_config['PATCH_SIZE'])))
         print("[epoch %d SSIM: %.4f --- best_epoch %d Best_SSIM %.4f]" % (
             epoch, ssim_val_rgb, best_epoch_ssim, best_ssim))
 
@@ -286,7 +286,7 @@ for epoch in range(start_epoch, OPT['EPOCHS'] + 1):
     torch.save({'epoch': epoch,
                 'state_dict': model_restored.state_dict(),
                 'optimizer': optimizer.state_dict()
-                }, os.path.join(model_dir, "model_latest_ep-{}_bs-{}_ps-{}.pth".format(OPT['EPOCHS'], OPT['BATCH'], SUNet['PATCH_SIZE'])))
+                }, os.path.join(model_dir, "model_latest_ep-{}_bs-{}_ps-{}.pth".format(optim_config['EPOCHS'], optim_config['BATCH'], sunet_config['PATCH_SIZE'])))
 
     writer.add_scalar('train/loss', epoch_loss, epoch)
     writer.add_scalar('train/lr', scheduler.get_lr()[0], epoch)

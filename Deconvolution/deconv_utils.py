@@ -1,4 +1,6 @@
 from skimage.transform import resize
+from collections import OrderedDict
+from pathlib import Path
 import numpy as np
 import torch
 import math
@@ -79,3 +81,14 @@ def compute_tikhonov_kernel(psf, balance):
 def load_checkpoint(model, checkpoint_path, device="cpu"):
         checkpoint = torch.load(checkpoint_path, map_location=torch.device(device))
         model.load_state_dict(checkpoint["state_dict"])
+
+def convert_checkpoint_from_sunet_model_to_sunet(model_dir,input_name,output_name):
+    input_path = Path(model_dir) / input_name
+    output_path = Path(model_dir) / output_name
+    ckpt = torch.load(input_path, map_location='cpu')
+    
+    stripped = OrderedDict(
+        (k.removeprefix('swin_unet.'), v) for k, v in ckpt['state_dict'].items()
+    )
+    ckpt['state_dict'] = stripped
+    torch.save(ckpt, output_path)
