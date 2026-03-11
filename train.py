@@ -1,6 +1,4 @@
 import os
-from this import d
-# from traceback import print_tb
 
 import torch
 import yaml
@@ -21,7 +19,7 @@ import random
 
 from warmup_scheduler import GradualWarmupScheduler
 # from tqdm import tqdm
-from tensorboardX import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 
 import gc
 # from GPUtil import showUtilization as gpu_usage
@@ -106,8 +104,8 @@ L1_loss = nn.L1Loss()
 print('==> Loading datasets')
 
 # Read Saved Batches   
-x_train = np.load('/home/users/a/akhaury/scratch/SingleChannel_Deconv/x_train.npy')
-y_train = np.load('/home/users/a/akhaury/scratch/SingleChannel_Deconv/y_train.npy')
+x_train = np.load('/data/fnammour/sunet/data/x_train_mini.npy')
+y_train = np.load('/data/fnammour/sunet/data/y_train_mini.npy')
 
 # Normalize targets
 x_train = x_train - np.mean(x_train, axis=(1,2), keepdims=True)
