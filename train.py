@@ -4,7 +4,7 @@ import torch
 import yaml
 
 from Deconvolution.deconv_sunet import instantiate_sunet_from_config
-from utils import network_parameters
+from model.utils import network_parameters
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import TensorDataset, DataLoader

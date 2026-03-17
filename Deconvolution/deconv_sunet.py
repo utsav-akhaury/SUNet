@@ -24,6 +24,7 @@ import numpy as np
 SUNET_PATH = '/home/fnammour/code/SUNet/'
 sys.path.insert(1, SUNET_PATH)
 from model.SUNet import SUNet
+from model.imager import SUNetImager
 
 from Deconvolution.deconv_utils import compute_tikhonov_kernel, resize_batch_conserve_flux, load_checkpoint
 
@@ -74,11 +75,39 @@ def instantiate_sunet_from_config(config:dict):
                                final_upsample=config['SWINUNET']['FINAL_UPSAMPLE'])
     return model
 
+def instantiate_SUNetImager_from_config(config:dict, device="auto"):
+    model = SUNetImager(img_size=config['SWINUNET']['IMG_SIZE'],
+                               patch_size=config['SWINUNET']['PATCH_SIZE'],
+                               in_chans=config['SWINUNET']['IN_CHANS'],
+                               out_chans=config['SWINUNET']['OUT_CHANS'],
+                               embed_dim=config['SWINUNET']['EMB_DIM'],
+                               depths=config['SWINUNET']['DEPTH_EN'],
+                               num_heads=config['SWINUNET']['HEAD_NUM'],
+                               window_size=config['SWINUNET']['WIN_SIZE'],
+                               mlp_ratio=config['SWINUNET']['MLP_RATIO'],
+                               qkv_bias=config['SWINUNET']['QKV_BIAS'],
+                               qk_scale=config['SWINUNET']['QK_SCALE'],
+                               drop_rate=config['SWINUNET']['DROP_RATE'],
+                               drop_path_rate=config['SWINUNET']['DROP_PATH_RATE'],
+                               ape=config['SWINUNET']['APE'],
+                               patch_norm=config['SWINUNET']['PATCH_NORM'],
+                               use_checkpoint=config['SWINUNET']['USE_CHECKPOINTS'],
+                               final_upsample=config['SWINUNET']['FINAL_UPSAMPLE'],
+                               device=device)
+    return model
+
 def instantiate_and_load_sunet(checkpoint_path:str, device=torch.device("cpu")):
     with open(Path(SUNET_PATH) / 'training.yaml', 'r') as config:
         config = yaml.safe_load(config)
     model = instantiate_sunet_from_config(config)
     load_checkpoint(model=model, checkpoint_path=checkpoint_path, device=device)
+    return model
+
+def instantiate_and_load_SUNetImager(checkpoint_path:str, device=torch.device("cpu")):
+    with open(Path(SUNET_PATH) / 'training.yaml', 'r') as config:
+        config = yaml.safe_load(config)
+    model = instantiate_SUNetImager_from_config(config)
+    load_checkpoint(model=model.sunet, checkpoint_path=checkpoint_path, device=model.device)
     return model
 
 def prepare_patches_for_inference(unfolded_patches, batch_count, channel_count, patch_size):

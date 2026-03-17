@@ -40,3 +40,6 @@ def load_optim(optimizer, weights):
 def network_parameters(nets):
     num_params = sum(param.numel() for param in nets.parameters())
     return num_params
+
+def get_device() -> torch.device:
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
